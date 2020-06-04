@@ -183,7 +183,7 @@ class TrezorPlugin(HW_PluginBase):
         return client
 
     def get_coin_name(self):
-        return "Testnet" if constants.net.TESTNET else "Bitcoin"
+        return "Testnet" if constants.net.TESTNET else "Dogecoin"
 
     def initialize_device(self, device_id, wizard, handler):
         # Initialization method
@@ -333,6 +333,8 @@ class TrezorPlugin(HW_PluginBase):
         inputs = self.tx_inputs(tx, xpub_path, True)
         outputs = self.tx_outputs(keystore.get_derivation(), tx)
         details = SignTx(lock_time=tx.locktime, version=tx.version)
+        z = ("self.get_coin_name()  : {} \n inputs  :   {}  \n outputs  :   {}  \n  details   :   {} \n  prev_tx  :   {}").format(self.get_coin_name(),inputs,outputs,details,prev_tx)
+        print(z)
         signatures, _ = client.sign_tx(self.get_coin_name(), inputs, outputs, details=details, prev_txes=prev_tx)
         signatures = [(bh2u(x) + '01') for x in signatures]
         tx.update_signatures(signatures)

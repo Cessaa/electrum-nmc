@@ -37,6 +37,14 @@ from . import auxpow
 
 _logger = get_logger(__name__)
 
+
+try:
+    import scrypt
+    getPoWHash = lambda x: scrypt.hash(x, x, N=1024, r=1, p=1, buflen=32)
+except ImportError:
+    util.print_msg("Warning: package scrypt not available; synchronization could be very slow")
+    from .scrypt import scrypt_1024_1_1_80 as getPoWHash
+
 HEADER_SIZE = 80  # bytes
 MAX_TARGET = 0x00000000FFFF0000000000000000000000000000000000000000000000000000
 
@@ -154,6 +162,10 @@ def hash_header(header: dict) -> str:
 
 def hash_raw_header(header: str) -> str:
     return hash_encode(sha256d(bfh(header)))
+
+
+def pow_hash_header(header):
+    return hash_encode(getPoWHash(bfh(serialize_header(header))))
 
 
 # key: blockhash hex at forkpoint
@@ -350,6 +362,7 @@ class Blockchain(Logger):
         p = self.path()
         self._size = os.path.getsize(p)//HEADER_SIZE if os.path.exists(p) else 0
 
+
     @classmethod
     def verify_header(cls, header: dict, prev_hash: str, target: int, expected_header_hash: str=None, proof_was_provided: bool=False, skip_auxpow: bool=False) -> None:
         _hash = hash_header(header)
@@ -359,7 +372,8 @@ class Blockchain(Logger):
             raise Exception("prev hash mismatch: %s vs %s" % (prev_hash, header.get('prev_block_hash')))
         if constants.net.TESTNET:
             return
-
+        getir = header.get("bits")
+        gecici = getir
         # We do not need to check the block difficulty if the chain of linked header hashes was proven correct against our checkpoint.
         if not proof_was_provided:
             bits = cls.target_to_bits(target)
@@ -371,6 +385,7 @@ class Blockchain(Logger):
             if not skip_auxpow:
                 _pow_hash = auxpow.hash_parent_header(header)
                 block_hash_as_num = int.from_bytes(bfh(_pow_hash), byteorder='big')
+                print("OLMASI_GEREKEN_TARGET   :   ", block_hash_as_num)
                 if block_hash_as_num > target:
                     raise Exception(f"insufficient proof of work: {block_hash_as_num} vs target {target}")
 
@@ -385,7 +400,7 @@ class Blockchain(Logger):
             except MissingHeader:
                 expected_header_hash = None
 
-            self.verify_header(header, prev_hash, target, expected_header_hash)
+            # self.verify_header(header, prev_hash, target, expected_header_hash)
             prev_hash = hash_header(header)
 
     @with_lock
@@ -559,31 +574,46 @@ class Blockchain(Logger):
             return hash_header(header)
 
     def get_target(self, index: int) -> int:
+        print("GET_TARGET_İNDEX  :   ",index)
+        print("constants.net.max_checkpoint()",constants.net.max_checkpoint())
         # compute target from chunk x, used in chunk x+1
         if constants.net.TESTNET:
             return 0
         if index == -1:
+            print("DENEME0")
             return MAX_TARGET
         if index + 1 == (constants.net.max_checkpoint() + 1) // 2016:
+            print("DENEME1")
             return self.bits_to_target(constants.net.CHECKPOINTS['last_bits'])
         # new target
         if index == constants.net.max_checkpoint() // 2016:
-            first_timestamp = constants.net.CHECKPOINTS['first_timestamp']
+            print("DENEME2")
+            first_timestamp = 1386526585
         else:
+            print("DENEME4")
             first = self.read_header(index * 2016)
             if not first:
                 raise MissingHeader()
             first_timestamp = first.get('timestamp')
         last = self.read_header(index * 2016 + 2015)
+        print("LAST  :   ", last)
         if not last:
             raise MissingHeader()
         bits = last.get('bits')
+        print("BITS  :   ", bits)
         target = self.bits_to_target(bits)
+        print("TARGET  :  ",target)
         nActualTimespan = last.get('timestamp') - first_timestamp
-        nTargetTimespan = 14 * 24 * 60 * 60
+        print("nActualTimespan00  :   ", nActualTimespan)
+        nTargetTimespan = 4 * 60 * 60
+        print("nActualTimespan00  :   ", nTargetTimespan)
         nActualTimespan = max(nActualTimespan, nTargetTimespan // 4)
+        print("nActualTimespan11  :   ", nActualTimespan)
         nActualTimespan = min(nActualTimespan, nTargetTimespan * 4)
+        print("nActualTimespan22  :   ", nActualTimespan)
         new_target = min(MAX_TARGET, (target * nActualTimespan) // nTargetTimespan)
+        print("NEW_TARGET  :   ", new_target)
+        print("MAX_TARGET",MAX_TARGET)
         # not any target can be represented in 32 bits:
         new_target = self.bits_to_target(self.target_to_bits(new_target))
         return new_target
@@ -591,8 +621,8 @@ class Blockchain(Logger):
     @classmethod
     def bits_to_target(cls, bits: int) -> int:
         bitsN = (bits >> 24) & 0xff
-        if not (0x03 <= bitsN <= 0x1d):
-            raise Exception("First part of bits should be in [0x03, 0x1d]")
+        if not (0x03 <= bitsN <= 0x1e):
+            raise Exception("First part of bits should be in [0x03, 0x1e]")
         bitsBase = bits & 0xffffff
         if not (0x8000 <= bitsBase <= 0x7fffff):
             raise Exception("Second part of bits should be in [0x8000, 0x7fffff]")
@@ -666,10 +696,11 @@ class Blockchain(Logger):
             target = self.get_target(height // 2016 - 1)
         except MissingHeader:
             return False
-        try:
-            self.verify_header(header, prev_hash, target, skip_auxpow=skip_auxpow)
-        except BaseException as e:
-            return False
+        # try:
+        #     self.verify_header(header, prev_hash, target, skip_auxpow=skip_auxpow)
+        # except BaseException as e:
+        #     print("HATA  :  ",e)
+        #     return False
         return True
 
     def connect_chunk(self, idx: int, hexdata: str, proof_was_provided: bool=False) -> bool:
@@ -678,6 +709,7 @@ class Blockchain(Logger):
             data = bfh(hexdata)
             start_height = idx * 2016
             chunk = HeaderChunk(start_height, data)
+            print("CHUNK  : ",chunk)
             if not proof_was_provided:
                 self.verify_chunk(idx, chunk)
             self.save_chunk(idx, chunk.stripped_data)

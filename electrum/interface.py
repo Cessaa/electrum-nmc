@@ -108,6 +108,7 @@ class NotificationSession(RPCSession):
         return framer
 
     async def handle_request(self, request):
+        print("handle_request  :  ",request)
         self.maybe_log(f"--> {request}")
         try:
             if isinstance(request, Notification):
@@ -136,6 +137,7 @@ class NotificationSession(RPCSession):
             response = await asyncio.wait_for(
                 super().send_request(*args, **kwargs),
                 timeout)
+            # print("send_request_ response   :   ",response)
         except (TaskTimeout, asyncio.TimeoutError) as e:
             raise RequestTimedOut(f'request timed out: {args} (id: {msg_id})') from e
         except CodeMessageError as e:
@@ -562,6 +564,8 @@ class Interface(Logger):
 
         res = await self.session.send_request('blockchain.block.headers', [height, count, cp_height])
 
+        print("request_header_request  :  ",res)
+
         hexdata = res['hex']
         data = bfh(hexdata)
         chunk = HeaderChunk(height, data)
@@ -746,6 +750,7 @@ class Interface(Logger):
         return await self._resolve_potential_chain_fork_given_forkpoint(good, bad, bad_header)
 
     async def _search_headers_binary(self, height, bad, bad_header, chain):
+        print("heigh  :  ",height,"bad   :   ",bad,"bad_header   :   ", bad_header,  "chain  :   ",chain)
         assert bad == bad_header['block_height']
         _assert_header_does_not_check_against_any_chain(bad_header)
 
@@ -767,7 +772,9 @@ class Interface(Logger):
                 break
 
         mock = 'mock' in bad_header and bad_header['mock']['connect'](height)
+        print("mock deneme  :  ", "version" in bad_header)
         real = not mock and self.blockchain.can_connect(bad_header, check_height=False)
+        print("mock   : ",mock ," real   :   ",real, "good    :   ",good, "bad   :   ",bad,"heigh   :   ",height)
         if not real and not mock:
             raise Exception('unexpected bad header during binary: {}'.format(bad_header))
         _assert_header_does_not_check_against_any_chain(bad_header)

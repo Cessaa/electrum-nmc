@@ -401,9 +401,11 @@ class Network(Logger):
 
         async def get_banner():
             self.banner = await session.send_request('server.banner')
+            print("server.banner  :   ", self.banner)
             self.notify('banner')
         async def get_donation_address():
             addr = await session.send_request('server.donation_address')
+            print("addr   :   ",addr)
             if not bitcoin.is_address(addr):
                 if addr:  # ignore empty string
                     self.logger.info(f"invalid donation address from server: {repr(addr)}")
@@ -411,6 +413,7 @@ class Network(Logger):
             self.donation_address = addr
         async def get_server_peers():
             server_peers = await session.send_request('server.peers.subscribe')
+            print("server_peers   :   ",server_peers)
             random.shuffle(server_peers)
             max_accepted_peers = len(constants.net.DEFAULT_SERVERS) + NUM_RECENT_SERVERS
             server_peers = server_peers[:max_accepted_peers]
@@ -418,6 +421,7 @@ class Network(Logger):
             self.notify('servers')
         async def get_relay_fee():
             relayfee = await session.send_request('blockchain.relayfee')
+            print("relayfee   :   ",relayfee)
             if relayfee is None:
                 self.relay_fee = None
             else:
@@ -437,8 +441,10 @@ class Network(Logger):
         self.config.requested_fee_estimates()
         async with TaskGroup() as group:
             histogram_task = await group.spawn(session.send_request('mempool.get_fee_histogram'))
+            print("histogram_task   :   ",histogram_task)
             fee_tasks = []
             for i in FEE_ETA_TARGETS:
+                print("fee_eta_targets   :   ", fee_tasks.append((i, await group.spawn(session.send_request('blockchain.estimatefee', [i])))))
                 fee_tasks.append((i, await group.spawn(session.send_request('blockchain.estimatefee', [i]))))
         self.config.mempool_fees = histogram = histogram_task.result()
         self.logger.info(f'fee_histogram {histogram}')
@@ -988,6 +994,7 @@ class Network(Logger):
             raise Exception(f"{repr(tx_hash)} is not a txid")
         if not is_non_negative_integer(tx_height):
             raise Exception(f"{repr(tx_height)} is not a block height")
+        print("get_merkle_for_transaction   :   ",interface.session.send_request('blockchain.transaction.get_merkle', [tx_hash, tx_height]))
         return await interface.session.send_request('blockchain.transaction.get_merkle', [tx_hash, tx_height])
 
     @best_effort_reliable
@@ -997,6 +1004,7 @@ class Network(Logger):
             timeout = self.get_network_timeout_seconds(NetworkTimeout.Urgent)
         try:
             out = await interface.session.send_request('blockchain.transaction.broadcast', [str(tx)], timeout=timeout)
+            print("out   :   ",out)
             # note: both 'out' and exception messages are untrusted input from the server
         except (RequestTimedOut, asyncio.CancelledError, asyncio.TimeoutError):
             raise  # pass-through
@@ -1181,6 +1189,7 @@ class Network(Logger):
     async def listunspent_for_scripthash(self, sh: str, interface: Interface = None) -> List[dict]:
         if not is_hash256_str(sh):
             raise Exception(f"{repr(sh)} is not a scripthash")
+        print("listunspent_for_scripthash   :   ", interface.session.send_request('blockchain.scripthash.listunspent', [sh]))
         return await interface.session.send_request('blockchain.scripthash.listunspent', [sh])
 
     @best_effort_reliable
@@ -1189,6 +1198,7 @@ class Network(Logger):
     async def get_balance_for_scripthash(self, sh: str, interface: Interface = None) -> dict:
         if not is_hash256_str(sh):
             raise Exception(f"{repr(sh)} is not a scripthash")
+        print("get_balance_for_scripthash   :   ", interface.session.send_request('blockchain.scripthash.get_balance', [sh]))
         return await interface.session.send_request('blockchain.scripthash.get_balance', [sh])
 
     def blockchain(self) -> Blockchain:
@@ -1425,10 +1435,12 @@ class Network(Logger):
         while not self.is_connected():
             await asyncio.sleep(1)
         session = self.interface.session
+        print("get_peers   :   ",parse_servers(await session.send_request('server.peers.subscribe')))
         return parse_servers(await session.send_request('server.peers.subscribe'))
 
     async def send_multiple_requests(self, servers: List[str], method: str, params: Sequence):
         responses = dict()
+        print("responses   :   ",responses)
         async def get_response(server):
             interface = Interface(self, server, self.proxy)
             timeout = self.get_network_timeout_seconds(NetworkTimeout.Urgent)
@@ -1439,6 +1451,7 @@ class Network(Logger):
                 return
             try:
                 res = await interface.session.send_request(method, params, timeout=10)
+                print("res   :   ",res)
             except Exception as e:
                 res = e
             responses[interface.server] = res
