@@ -574,7 +574,7 @@ class Blockchain(Logger):
             return hash_header(header)
 
     def get_target(self, index: int) -> int:
-        print("GET_TARGET_İNDEX  :   ",index)
+        print("GET_TARGET_INDEX  :   ",index)
         print("constants.net.max_checkpoint()",constants.net.max_checkpoint())
         # compute target from chunk x, used in chunk x+1
         if constants.net.TESTNET:
