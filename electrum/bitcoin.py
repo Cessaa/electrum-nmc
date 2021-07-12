@@ -23,6 +23,7 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from decimal import Decimal
 import hashlib
 from typing import List, Tuple, TYPE_CHECKING, Optional, Union
 from enum import IntEnum
@@ -42,7 +43,7 @@ if TYPE_CHECKING:
 
 COINBASE_MATURITY = 100
 COIN = 100000000
-TOTAL_COIN_SUPPLY_LIMIT_IN_BTC = 21000000
+TOTAL_COIN_SUPPLY_LIMIT_IN_BTC = Decimal('Infinity')
 
 # supported types of transaction outputs
 TYPE_ADDRESS = 0
